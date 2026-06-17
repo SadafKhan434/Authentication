@@ -1,68 +1,85 @@
-import React, { useState,useEffect,useCallback } from "react";
-const AuthContext=React.createContext({
-token:'',
-isLoggedIn: false,
-isLoggedIn:true,
-login:(token)=>{},
-    logout:()=>{}
-})
-const API_KEY='AIzaSyCmgfZ_CuWMgu_eR9F4ZRJnnXpMIXaGOVw';
-   export  const AuthContextProvider=(props)=>{
-    const initialToken= localStorage.getItem('token');
-        const [token,setToken]=useState(initialToken);
-        const[isLoading,setIsLoading]=useState(true);
-        const UserIsLoggedIn = !!token
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
-        const loginHandler=(token)=>{
-            setToken(token)
-            localStorage.setItem('token',token)
-        }
-        const logoutHandler=useCallback(()=>{
-            setToken(null)
-            localStorage.removeItem('token')
-        },[]);
-        useEffect(()=>{
-            if(!initialToken){
-                setIsLoading(false);
-                return
-            }
-            const validateTokenOnRefresh = async () => {
-      try {
-        const response = await fetch(
-          `https://googleapis.com='AIzaSyCmgfZ_CuWMgu_eR9F4ZRJnnXpMIXaGOVw'`,
-          {
-            method: 'POST',
-            body: JSON.stringify({ idToken: initialToken }),
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+const AuthContext = React.createContext({
+  token: '',
+  isLoggedIn: false,
+  isLoading: false,
+  login: (token) => {},
+  logout: () => {},
+});
 
-        if (!response.ok) {
-          throw new Error('Token expired or invalid');
-        }
-        
-        setToken(initialToken);
-      } catch (error) {
-        logoutHandler(); 
-      } finally {
-        setIsLoading(false);
-      }
-    };
+const EXPIRATION_TIME = 5 * 60 * 1000; 
 
-    validateTokenOnRefresh();
-  }, [initialToken, logoutHandler]);
+const calculateRemainingTime = (expirationTime) => {
+  return expirationTime - Date.now();
+};
 
-        
-        const contextValue={
-            token:token,
-            isLoggedIn:UserIsLoggedIn,
-            login:loginHandler,
-            logout:logoutHandler
+const retrieveStoredToken = () => {
+  const storedToken = localStorage.getItem('token');
+  const storedExpirationTime = localStorage.getItem('expirationTime');
 
-        }
-        return<AuthContextProvider value={contextValue}>
-            {props.children}
-            </AuthContextProvider>
+  if (!storedToken || !storedExpirationTime) {
+    return null;
+  }
+
+  const remainingTime = calculateRemainingTime(+storedExpirationTime);
+
+  if (remainingTime <= 0) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('expirationTime');
+    return null;
+  }
+
+  return { token: storedToken, duration: remainingTime };
+};
+
+export const AuthContextProvider = (props) => {
+  const tokenData = retrieveStoredToken();
+  const [token, setToken] = useState(tokenData ? tokenData.token : null);
+  const [isLoading, setIsLoading] = useState(true);
+  const logoutTimerRef = useRef();
+
+  const logoutHandler = useCallback(() => {
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('expirationTime');
+
+    if (logoutTimerRef.current) {
+      clearTimeout(logoutTimerRef.current);
     }
+  }, []);
+
+  const loginHandler = (token) => {
+    setToken(token);
+    localStorage.setItem('token', token);
+
+    const expirationTime = Date.now() + EXPIRATION_TIME;
+    localStorage.setItem('expirationTime', expirationTime.toString());
+
+    const remainingTime = calculateRemainingTime(expirationTime);
+    logoutTimerRef.current = setTimeout(logoutHandler, remainingTime);
+  };
+
+  useEffect(() => {
+    if (tokenData) {
+      logoutTimerRef.current = setTimeout(logoutHandler, tokenData.duration);
+    }
+    setIsLoading(false);
+  }, [tokenData, logoutHandler]);
+
+  const contextValue = {
+    token: token,
+    isLoggedIn: !!token,
+    isLoading: isLoading,
+    login: loginHandler,
+    logout: logoutHandler,
+  };
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {props.children}
+    </AuthContext.Provider>
+  );
+};
 
 export default AuthContext;

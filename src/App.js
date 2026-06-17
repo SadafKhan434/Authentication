@@ -1,6 +1,5 @@
 import { useContext } from 'react';
-import { Switch, Route,Redirect } from 'react-router-dom';
-
+import { Switch, Route, Redirect } from 'react-router-dom';
 
 import Layout from './components/Layout/Layout';
 import UserProfile from './components/Profile/UserProfile';
@@ -9,8 +8,9 @@ import HomePage from './pages/HomePage';
 import AuthContext from './Store/auth-context';
 
 function App() {
-   const authCtx= useContext(AuthContext)
-   if (authCtx.isLoading) {
+  const authCtx = useContext(AuthContext);
+
+  if (authCtx.isLoading) {
     return <div>Loading authentication...</div>;
   }
 
@@ -20,17 +20,17 @@ function App() {
         <Route path='/' exact>
           <HomePage />
         </Route>
-       {!authCtx.isLoggedIn && (
-        <Route path='/auth'>
-          <AuthPage />
-        </Route>)}
-       
+        {!authCtx.isLoggedIn && (
+          <Route path='/auth'>
+            <AuthPage />
+          </Route>
+        )}
         <Route path='/profile'>
-         {authCtx.isLoggedIn &&  <UserProfile />}
-         {!authCtx.isLoggedIn &&  <Redirect to='/auth'/>}
+          {authCtx.isLoggedIn && <UserProfile />}
+          {!authCtx.isLoggedIn && <Redirect to='/auth' />}
         </Route>
         <Route path='*'>
-          <Redirect to='/'/>
+          <Redirect to='/' />
         </Route>
       </Switch>
     </Layout>
